@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+import os
+import sys
+
+import praw
+from praw.exceptions import APIException, ClientException, PRAWException
+from prawcore.exceptions import OAuthException, ResponseException
+
+VERSION = "1.0.1"
+
+def _die(message: str, exit_code: int = 1):
+    print(f"{sys.argv[0]}: {message}", file=sys.stderr)
+    sys.exit(exit_code)
+
+def _main():
+    if len(sys.argv) == 1:
+        _show_help()
+        sys.exit(0)
+    elif len(sys.argv) < 4:
+        print( f"{sys.argv[0]} SUBREDDIT IMAGE_PATH TITLE")
+        sys.exit(1);
+
+    required_env = ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_USERNAME", "REDDIT_PASSWORD"]
+    error = None
+    for var in required_env:
+        if not os.getenv(var):
+            missing_env_var = 1
+            print(f"Error: {var} environment variable is not set!")
+
+    if missing_env_var is not None:
+        sys.exit(1)
+
+    reddit = praw.Reddit(
+        client_id     = os.getenv("REDDIT_CLIENT_ID"),
+        client_secret = os.getenv("REDDIT_CLIENT_SECRET"),
+        username      = os.getenv("REDDIT_USERNAME"),
+        password      = os.getenv("REDDIT_PASSWORD"),
+        user_agent    = f"image uploader by u/{os.getenv('REDDIT_USERNAME')}"
+    )
+
+    subreddit  = sys.argv[1].split("/")[-1]
+    image_path = sys.argv[2]
+    title      = sys.argv[3]
+
+    ALLOWED_IMAGE_TYPES = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+    _, ext = os.path.splitext(image_path)
+    if ext.lower() not in ALLOWED_IMAGE_TYPES:
+       _die(f"Image file ({image_path}) does not appear to be a supported type ({', '.join(sorted(ALLOWED_IMAGE_TYPES))})")
+
+    MAX_FILE_SIZE = 20971520
+    file_size = os.path.getsize(image_path)
+    if file_size > MAX_FILE_SIZE:
+        _die(f"Image file ({image_path}) is too large ({file_size:,} bytes). Maximum is {MAX_FILE_SIZE:,} bytes.")
+
+    try:
+        submission = reddit.subreddit(subreddit).submit_image(
+            title,
+            image_path,
+        )
+    except OAuthException as e:
+        _die(f"Bad username or password")
+    except ResponseException as e:
+        if "401 HTTP" in str(e):
+            _die(f"Unauthorized: check REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
+        else:
+            _die("Response error: ({type(e).__name__}) {e}")
+    except APIException as e:
+        if "SUBREDDIT_NOEXIST" in str(e):
+            _die(f"Bad subreddit (f{subreddit})")
+        else:
+            _die(f"Reddit API exception: ({type(e).__name__}) {e}")
+    except ClientException as e:
+        _die(f"Client exception: ({type(e).__name__}) {e}")
+    except PRAWException as e:
+        _die(f"PRAW exception: {e}")
+    except FileNotFoundError as e:
+        _die(f"Could not find file ({image_path}): {e}")
+    except Exception as e:
+        _die(f"Unexpected exception ({type(e).__name__}): {e}")
+    else:
+        print(f"{sys.argv[0]}: Image posted successfully: https://reddit.com{submission.permalink}")
+        sys.exit(0)
+
+def _show_help():
+    message = f"""
+    version {VERSION}
+
+    {sys.argv[0]} SUBREDDIT IMAGE_PATH TITLE
+
+        SUBREDDIT  - the name of the subreddit without the /r/
+        IMAGE_PATH - a JPEG, PNG, or WEBP file
+        TITLE      - the post title
+
+    For example:
+
+        {sys.argv[0]} test /home/user/ "Some post title"
+    """
+
+    print(message)
+
+if __name__ == "__main__":
+    _main()
