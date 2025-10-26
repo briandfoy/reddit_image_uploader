@@ -88,7 +88,7 @@ def _show_help():
     {sys.argv[0]} SUBREDDIT IMAGE_PATH TITLE
 
         SUBREDDIT  - the name of the subreddit without the /r/
-        IMAGE_PATH - a JPEG, PNG, or WEBP file
+        IMAGE_PATH - a JPEG, PNG, GIF, or WEBP file
         TITLE      - the post title
 
     For example:
