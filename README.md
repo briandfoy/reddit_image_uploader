@@ -19,6 +19,8 @@ For example, you can use */r/test* to test it.
 
 	% reddit_image_uploader test cat.jpg "This is my cat"
 
+I use this a small part of a pipeline, so it doesn't need to do a lot.
+
 ## License
 
 You can use this under the terms of the Artistic License 2.0.
